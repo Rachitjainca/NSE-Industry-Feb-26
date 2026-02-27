@@ -1,128 +1,75 @@
-# NSE Futures & Options Data Aggregator
+﻿# NSE + BSE FO Market Data Collector
 
-A Python script that automatically fetches, caches, and aggregates daily NSE FO market data starting from February 1, 2025.
-
-## Features
-
-- **Automatic Data Fetching**: Downloads daily NSE FO market data from official NSE archives
-- **Smart Caching**: Caches downloaded files and only fetches new data on subsequent runs (catch-up updates)
-- **Holiday Handling**: Automatically skips weekends and NSE trading holidays
-- **Error Resilience**: Implements retry logic with configurable timeouts for network issues
-- **Data Aggregation**: Sums key metrics (NO_OF_CONT, NO_OF_TRADE, NOTION_VAL, PR_VAL) per trading day
-- **Append-Only Output**: Maintains a CSV file with historical aggregated data
-
-## Installation
-
-1. Ensure Python 3.8+ is installed
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-Run the script:
-```bash
-python nse_fo_aggregator.py
-```
-
-### First Run
-- Fetches data from Feb 1, 2025 to current date
-- Creates output file `nse_fo_aggregated.csv`
-- Creates metadata file `nse_fo_metadata.json` for tracking
-
-### Subsequent Runs
-- Only processes new dates since last run
-- Appends new data to `nse_fo_aggregated.csv`
-- Fast execution (only downloads missing data)
+Automated daily pipeline that collects Futures & Options market data from NSE and BSE, caches it locally, and pushes the combined output to a Google Sheet.
 
 ## Output
 
-### Main Output: `nse_fo_aggregated.csv`
-CSV file with columns:
-- **Date**: Trading date (DD-MMM-YYYY format)
-- **NO_OF_CONT**: Sum of number of contracts
-- **NO_OF_TRADE**: Sum of number of trades
-- **NOTION_VAL**: Sum of notional value
-- **PR_VAL**: Sum of premium value
+`nse_fo_aggregated_data.csv` — 19 columns, one row per trading day from 1 Feb 2025 onwards.
 
-Example:
+| Column | Source | Description |
+|---|---|---|
+| `Date` | — | DD-MM-YYYY |
+| `NSE_NO_OF_CONT` | NSE FO | Total contracts |
+| `NSE_NO_OF_TRADE` | NSE FO | Total trades |
+| `NSE_NOTION_VAL` | NSE FO | Notional value |
+| `NSE_PR_VAL` | NSE FO | Premium value |
+| `BSE_TTL_TRADED_QTY` | BSE Derivatives (IO+IF) | Total traded quantity |
+| `BSE_TTL_TRADED_VAL` | BSE Derivatives (IO+IF) | Total traded value |
+| `BSE_AVG_TRADED_PRICE` | BSE Derivatives (IO+IF) | Average traded price |
+| `BSE_NO_OF_TRADES` | BSE Derivatives (IO+IF) | Number of trades |
+| `NSE_CAT_RETAIL_BUY_CR` | NSE FO Category | Retail buy turnover (Rs.Cr) |
+| `NSE_CAT_RETAIL_SELL_CR` | NSE FO Category | Retail sell turnover (Rs.Cr) |
+| `NSE_CAT_RETAIL_AVG_CR` | NSE FO Category | Retail avg turnover (Rs.Cr) |
+| `NSE_EQ_RETAIL_BUY_CR` | NSE Equity Category | Retail buy turnover (Rs.Cr) |
+| `NSE_EQ_RETAIL_SELL_CR` | NSE Equity Category | Retail sell turnover (Rs.Cr) |
+| `NSE_EQ_RETAIL_AVG_CR` | NSE Equity Category | Retail avg turnover (Rs.Cr) |
+| `MRG_OUTSTANDING_BOD_LAKHS` | NSE Margin | Outstanding at start of day (Rs.Lakh) |
+| `MRG_FRESH_EXP_LAKHS` | NSE Margin | Fresh exposure during day (Rs.Lakh) |
+| `MRG_EXP_LIQ_LAKHS` | NSE Margin | Exposure liquidated (Rs.Lakh) |
+| `MRG_NET_EOD_LAKHS` | NSE Margin | Net outstanding end of day (Rs.Lakh) |
+
+## Project Structure
+
 ```
-Date,NO_OF_CONT,NO_OF_TRADE,NOTION_VAL,PR_VAL
-01-Feb-2025,1234567,2345678,987654321,123456789
-04-Feb-2025,1345678,2456789,1098765432,234567890
-...
+collector.py              # Main data collector (5 sources, ~550 lines)
+gsheet_upload.py          # Uploads CSV to Google Sheet
+requirements.txt          # Python dependencies
+.github/workflows/
+  daily_collect.yml       # GitHub Actions — runs every day at 7 PM IST
+nse_fo_cache.json         # NSE FO cache
+bse_fo_cache.json         # BSE cache
+nse_cat_cache.json        # NSE FO category cache
+nse_eq_cat_cache.json     # NSE equity category cache
+nse_mrg_cache.json        # NSE margin trading cache
+nse_fo_aggregated_data.csv  # Final combined output
 ```
 
-### Metadata: `nse_fo_metadata.json`
-Tracks:
-- List of processed dates
-- Last run timestamp
-- Used for incremental updates
+## Running locally
 
-### Cache Directory: `nse_cache/`
-Stores downloaded ZIP files for potential offline processing
-
-## Configuration
-
-Edit the constants in the script to customize:
-
-```python
-START_DATE = datetime(2025, 2, 1)      # Start date for data collection
-TIMEOUT_SECONDS = 30                    # Download timeout (seconds)
-TIMEOUT_RETRIES = 3                    # Retry attempts on timeout
-NSE_HOLIDAYS = {...}                   # Add/modify NSE holidays
+```bash
+pip install -r requirements.txt
+python collector.py         # fetch new data + write CSV
+python gsheet_upload.py     # push CSV to Google Sheet
 ```
 
-## Error Handling
+## Automation (GitHub Actions)
 
-- **404 Errors**: Files not found are silently skipped (likely weekends/holidays)
-- **Timeout Errors**: Script retries 3 times before moving to next date
-- **Parsing Errors**: Logged as warnings, process continues with next file
-- **Network Issues**: Retry logic with exponential backoff
+The workflow `.github/workflows/daily_collect.yml` runs every day at **7:00 PM IST** (13:30 UTC).
 
-## Logging
+### One-time setup required
 
-Console output shows:
-- ✓ Successfully processed dates
-- ✗ Failed dates
-- ⚠ Warnings and errors
-- ⊘ Skipped days (weekends/holidays)
+1. **Add GitHub Secret** — go to *Settings → Secrets → Actions*, create:
+   - Name: `GSHEET_SERVICE_ACCOUNT`
+   - Value: entire contents of the Google service-account JSON key file
 
-## Date Format
+2. **Share the Google Sheet** with the service account email:
+   ```
+   nse-industry-data@groww-data-488513.iam.gserviceaccount.com
+   ```
+   Grant **Editor** access.
 
-- **Internal**: DDMMYYYY (stored in metadata)
-- **Output CSV**: DD-MMM-YYYY (e.g., 01-Feb-2025)
-- **URL**: DDMMYYYY (e.g., http://.../fo01022025.zip)
-
-## Performance Notes
-
-- First run: ~5-10 minutes (depending on data availability and network)
-- Subsequent runs: <1 second (only new dates)
-- Downloads are optimized with timeout handling
-- No repeated downloads due to caching
-
-## Troubleshooting
-
-### "File not found" for a specific date
-- Check if it's a weekend or NSE holiday
-- Add date to `NSE_HOLIDAYS` if needed
-- Verify date format in URL
-
-### Timeout errors
-- Increase `TIMEOUT_SECONDS` in script
-- Check internet connection
-- Verify NSE site is accessible
-
-### Missing columns in CSV
-- NSE may have changed CSV format
-- Update `REQUIRED_COLUMNS` constant
-- Check actual column names in downloaded CSV
-
-## NSE Holidays (2025-2026)
-
-Predefined holidays include major Indian national holidays and market closures. Update `NSE_HOLIDAYS` set if holidays change.
-
-## Contact & Support
-
-For issues with NSE data format changes or missing holidays, update the `NSE_HOLIDAYS` set in the script.
+Each automated run:
+- Skips all already-cached dates (fully incremental)
+- Fetches only new trading days from all 5 sources
+- Uploads the full CSV to Google Sheet
+- Commits updated caches + CSV back to the repo

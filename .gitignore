@@ -27,5 +27,8 @@ temp_nse_cat_probe.py
 .DS_Store
 Thumbs.db
 
+# Runtime log (committed for audit trail)
+# collector.log
+
 # VS Code
 .vscode/

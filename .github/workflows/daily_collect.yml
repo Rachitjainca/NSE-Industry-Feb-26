@@ -37,7 +37,7 @@ jobs:
 
       # ── 5. Run the data collector ─────────────────────────────────────────────
       - name: Collect NSE + BSE data
-        run: python "NSE BSE Combined latest.py"
+        run: python collector.py
 
       # ── 6. Push CSV → Google Sheets ───────────────────────────────────────────
       - name: Upload to Google Sheets
@@ -54,7 +54,8 @@ jobs:
             nse_cat_cache.json \
             nse_eq_cat_cache.json \
             nse_mrg_cache.json \
-            nse_fo_aggregated_data.csv
+            nse_fo_aggregated_data.csv \
+            collector.log || true
           # only commit when there are actual changes
           git diff --staged --quiet || \
             git commit -m "chore: auto-update data $(date +'%Y-%m-%d')"
