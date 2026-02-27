@@ -56,6 +56,7 @@ jobs:
             nse_cat_cache.json \
             nse_eq_cat_cache.json \
             nse_mrg_cache.json \
+            nse_part_cache.json \
             nse_fo_aggregated_data.csv \
             collector.log || true
           # only commit when there are actual changes

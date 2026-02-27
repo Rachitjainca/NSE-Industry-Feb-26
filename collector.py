@@ -77,6 +77,7 @@ NSE_FO_BASE    = "https://nsearchives.nseindia.com/archives/fo/mkt/"
 NSE_CAT_BASE   = "https://nsearchives.nseindia.com/archives/fo/cat/"
 NSE_EQCAT_BASE = "https://nsearchives.nseindia.com/archives/equities/cat/"
 NSE_MRG_BASE   = "https://nsearchives.nseindia.com/content/equities/"
+NSE_PART_BASE  = "https://nsearchives.nseindia.com/content/nsccl/"
 BSE_FO_BASE    = "https://www.bseindia.com/download/Bhavcopy/Derivative/"
 
 # ── Cache file paths ─────────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ BSE_CACHE       = "bse_fo_cache.json"
 NSE_CAT_CACHE   = "nse_cat_cache.json"
 NSE_EQCAT_CACHE = "nse_eq_cat_cache.json"
 NSE_MRG_CACHE   = "nse_mrg_cache.json"
+NSE_PART_CACHE  = "nse_part_cache.json"
 
 # ── BSE column indices (0-based) in MS_<date>-01.csv ────────────────────────
 BSE_COL_TTL_QTY   = 15
@@ -540,6 +542,82 @@ class NSEMrgCollector(BaseCollector):
 
 
 # ============================================================================
+# 6. NSE Participant-wise FO Volume collector  (Client type only)
+# ============================================================================
+class NSEParticipantCollector(BaseCollector):
+    """
+    fao_participant_vol_<DDMMYYYY>.csv  (8-digit date in URL)
+    Picks the row where Client Type == 'Client' and extracts:
+      - Total Long Contracts  (col 13)
+      - Future Index Long     (col  1)
+      - Future Index Short    (col  2)
+    """
+
+    def __init__(self):
+        super().__init__("PART", NSE_PART_CACHE, NSE_HOME, NSE_HEADERS, NSE_HOLIDAYS)
+
+    def _get_url_and_file(self, date: datetime) -> Tuple[str, str]:
+        name = "fao_participant_vol_" + date.strftime("%d%m%Y") + ".csv"
+        return NSE_PART_BASE + name, name
+
+    def _parse(self, raw: bytes) -> Optional[Dict]:
+        try:
+            lines = [l for l in raw.decode("utf-8", errors="ignore").splitlines() if l.strip()]
+            if len(lines) < 2:
+                return None
+
+            # Row 0 is a title; row 1 is the header; data starts at row 2
+            # Find the header row (contains 'Client Type')
+            header_row = None
+            data_start  = 0
+            for i, line in enumerate(lines):
+                if "Client Type" in line:
+                    header_row = i
+                    data_start = i + 1
+                    break
+            if header_row is None:
+                logger.warning("[PART]  Header row not found")
+                return None
+
+            headers = [h.strip().strip('"') for h in next(csv.reader([lines[header_row]]))]
+            idx     = {h: i for i, h in enumerate(headers)}
+
+            col_total_long = idx.get("Total Long Contracts", 13)
+            col_fi_long    = idx.get("Future Index Long",    1)
+            col_fi_short   = idx.get("Future Index Short",   2)
+
+            for line in lines[data_start:]:
+                row = [c.strip().strip('"') for c in next(csv.reader([line]))]
+                if not row:
+                    continue
+                if row[0].strip().lower() == "client":
+                    total_long = float(row[col_total_long].replace(",", ""))
+                    fi_long    = float(row[col_fi_long].replace(",", ""))
+                    fi_short   = float(row[col_fi_short].replace(",", ""))
+                    logger.info(
+                        f"[PART]  Client — TotalLong={total_long:.0f}  "
+                        f"FILong={fi_long:.0f}  FIShort={fi_short:.0f}"
+                    )
+                    return {
+                        "CLT_TOTAL_LONG":  total_long,
+                        "CLT_FUT_IDX_LONG":  fi_long,
+                        "CLT_FUT_IDX_SHORT": fi_short,
+                    }
+
+            logger.warning("[PART]  'Client' row not found")
+            return None
+        except Exception as exc:
+            logger.error(f"[PART]  Parse error: {exc}")
+            return None
+
+    def _log_ok(self, date_str: str, d: Dict) -> None:
+        logger.info(
+            f"[PART]  [OK] {date_str}  TotalLong={d['CLT_TOTAL_LONG']:.0f}  "
+            f"FILong={d['CLT_FUT_IDX_LONG']:.0f}  FIShort={d['CLT_FUT_IDX_SHORT']:.0f}"
+        )
+
+
+# ============================================================================
 # Shared XLS parser (NSE Cat + NSE Eq Cat share identical structure)
 # ============================================================================
 def _parse_retail_xls(
@@ -573,10 +651,10 @@ def _parse_retail_xls(
 # Combined CSV writer
 # ============================================================================
 def write_output(
-    nse: Dict, bse: Dict, cat: Dict, eq_cat: Dict, mrg: Dict
+    nse: Dict, bse: Dict, cat: Dict, eq_cat: Dict, mrg: Dict, part: Dict
 ) -> None:
     all_dates = sorted(
-        set(nse) | set(bse) | set(cat) | set(eq_cat) | set(mrg),
+        set(nse) | set(bse) | set(cat) | set(eq_cat) | set(mrg) | set(part),
         key=lambda s: datetime.strptime(s, "%d%m%Y"),
     )
 
@@ -588,10 +666,12 @@ def write_output(
         "NSE_EQ_RETAIL_BUY_CR",  "NSE_EQ_RETAIL_SELL_CR",  "NSE_EQ_RETAIL_AVG_CR",
         "MRG_OUTSTANDING_BOD_LAKHS", "MRG_FRESH_EXP_LAKHS",
         "MRG_EXP_LIQ_LAKHS",        "MRG_NET_EOD_LAKHS",
+        "CLT_TOTAL_LONG_CONT", "CLT_FUT_IDX_LONG", "CLT_FUT_IDX_SHORT",
     ]
 
     def f2(v):  return f"{v:.2f}" if v is not None else ""
     def f4(v):  return f"{v:.4f}" if v is not None else ""
+    def fi(v):  return f"{v:.0f}" if v is not None else ""
 
     try:
         with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as fh:
@@ -600,7 +680,8 @@ def write_output(
             for ds in all_dates:
                 display = datetime.strptime(ds, "%d%m%Y").strftime("%d-%m-%Y")
                 n = nse.get(ds);  b = bse.get(ds)
-                c = cat.get(ds);  e = eq_cat.get(ds); m = mrg.get(ds)
+                c = cat.get(ds);  e = eq_cat.get(ds)
+                m = mrg.get(ds);  p = part.get(ds)
                 w.writerow([
                     display,
                     f2(n and n["NO_OF_CONT"]),    f2(n and n["NO_OF_TRADE"]),
@@ -617,6 +698,9 @@ def write_output(
                     f2(m and m["MRG_FRESH_EXP_LAKHS"]),
                     f2(m and m["MRG_EXP_LIQ_LAKHS"]),
                     f2(m and m["MRG_NET_EOD_LAKHS"]),
+                    fi(p and p["CLT_TOTAL_LONG"]),
+                    fi(p and p["CLT_FUT_IDX_LONG"]),
+                    fi(p and p["CLT_FUT_IDX_SHORT"]),
                 ])
         logger.info(f"Output written → {OUTPUT_FILE}  ({len(all_dates)} rows)")
     except Exception as exc:
@@ -634,11 +718,12 @@ def main() -> None:
     collectors = []
     try:
         steps = [
-            ("NSE FO",             NSEFOCollector),
-            ("BSE Derivatives",    BSEFOCollector),
-            ("NSE FO Cat",         NSECatCollector),
-            ("NSE Equity Cat",     NSEEqCatCollector),
-            ("NSE Margin Trading", NSEMrgCollector),
+            ("NSE FO",                  NSEFOCollector),
+            ("BSE Derivatives",         BSEFOCollector),
+            ("NSE FO Cat",              NSECatCollector),
+            ("NSE Equity Cat",          NSEEqCatCollector),
+            ("NSE Margin Trading",      NSEMrgCollector),
+            ("NSE Participant Vol",     NSEParticipantCollector),
         ]
         for label, Cls in steps:
             logger.info(f"\n--- {label} ---")
@@ -647,14 +732,14 @@ def main() -> None:
             c.collect()
 
         logger.info("\n--- Writing combined output ---")
-        nse, bse, cat, eq_cat, mrg = [c.cache for c in collectors]
-        write_output(nse, bse, cat, eq_cat, mrg)
+        nse, bse, cat, eq_cat, mrg, part = [c.cache for c in collectors]
+        write_output(nse, bse, cat, eq_cat, mrg, part)
         logger.info("All done.")
 
     except KeyboardInterrupt:
         logger.info("Interrupted — saving partial results ...")
         caches = [c.cache for c in collectors]
-        while len(caches) < 5:
+        while len(caches) < 6:
             caches.append({})
         write_output(*caches)
 
