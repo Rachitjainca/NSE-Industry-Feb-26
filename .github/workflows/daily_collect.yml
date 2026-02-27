@@ -1,0 +1,61 @@
+name: Daily NSE BSE Data Collector
+
+on:
+  schedule:
+    # 7:00 PM IST = 13:30 UTC  (runs every calendar day)
+    - cron: '30 13 * * *'
+  workflow_dispatch:          # allow manual trigger from GitHub UI
+
+jobs:
+  collect-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60       # safety cap – full backfill takes ~20 min
+
+    steps:
+      # ── 1. Checkout (with push token so we can write caches back) ───────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      # ── 2. Python setup ──────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # ── 3. Install dependencies ───────────────────────────────────────────────
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # ── 4. Write service-account key from secret ─────────────────────────────
+      - name: Write Google service-account key
+        run: |
+          echo '${{ secrets.GSHEET_SERVICE_ACCOUNT }}' > groww-data-488513-384d7e65fa4f.json
+
+      # ── 5. Run the data collector ─────────────────────────────────────────────
+      - name: Collect NSE + BSE data
+        run: python "NSE BSE Combined latest.py"
+
+      # ── 6. Push CSV → Google Sheets ───────────────────────────────────────────
+      - name: Upload to Google Sheets
+        run: python gsheet_upload.py
+
+      # ── 7. Commit updated caches + CSV back to the repo ──────────────────────
+      - name: Commit & push updated cache files
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add \
+            nse_fo_cache.json \
+            bse_fo_cache.json \
+            nse_cat_cache.json \
+            nse_eq_cat_cache.json \
+            nse_mrg_cache.json \
+            nse_fo_aggregated_data.csv
+          # only commit when there are actual changes
+          git diff --staged --quiet || \
+            git commit -m "chore: auto-update data $(date +'%Y-%m-%d')"
+          git push
