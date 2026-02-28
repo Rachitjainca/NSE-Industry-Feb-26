@@ -109,6 +109,10 @@ NSE_MARKET_TURNOVER_CACHE = "nse_market_turnover_cache.json"
 BSE_MARKET_TURNOVER_API = "https://api.bseindia.com/BseIndiaAPI/api/MTurnover/w"
 BSE_MARKET_TURNOVER_CACHE = "bse_market_turnover_cache.json"
 
+# ── BSE Index Derivatives Summary API ───────────────────────────────────────
+BSE_IDX_DERIV_SUMMARY_API = "https://api.bseindia.com/BseIndiaAPI/api/Marketwatchindxderisummarynew/w"
+BSE_IDX_DERIV_SUMMARY_CACHE = "bse_idx_deriv_summary_cache.json"
+
 # ── BSE column indices (0-based) in MS_<date>-01.csv ────────────────────────
 BSE_COL_TTL_QTY   = 15
 BSE_COL_TTL_VAL   = 16
@@ -1463,12 +1467,110 @@ class BSEMarketTurnoverCollector:
 
 
 # ============================================================================
+# BSE Index Derivatives Summary (Index Futures)
+# ============================================================================
+class BSEIdxDerivSummaryCollector:
+    """Fetches BSE Index Derivatives Summary – extracts Index Futures (IF) row."""
+
+    def __init__(self):
+        self.tag = "BSE_IDX_DERIV"
+        self.cache_file = BSE_IDX_DERIV_SUMMARY_CACHE
+        self.cache: Dict = {}
+        self.load_cache()
+
+    def load_cache(self) -> None:
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, encoding="utf-8") as f:
+                    self.cache = json.load(f)
+                logger.info(f"[{self.tag}] Cache loaded: {len(self.cache)} entries")
+            except Exception as exc:
+                logger.warning(f"[{self.tag}] Cache load error: {exc}")
+                self.cache = {}
+
+    def save_cache(self) -> None:
+        try:
+            with open(self.cache_file, "w", encoding="utf-8") as f:
+                json.dump(self.cache, f, indent=2)
+            logger.info(f"[{self.tag}] Cache saved: {len(self.cache)} entries")
+        except Exception as exc:
+            logger.error(f"[{self.tag}] Cache save error: {exc}")
+
+    def collect(self) -> None:
+        """Fetch BSE Index Derivatives Summary and extract IF (Index Futures) row."""
+        logger.info(f"[{self.tag}] Fetching BSE Index Derivatives Summary...")
+
+        try:
+            session = requests.Session()
+            session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://www.bseindia.com/",
+                "Origin": "https://www.bseindia.com",
+            })
+
+            resp = session.get(BSE_IDX_DERIV_SUMMARY_API, timeout=REQUEST_TIMEOUT)
+
+            if resp.status_code != 200:
+                logger.error(f"[{self.tag}] API returned {resp.status_code}")
+                return
+
+            raw = resp.json()
+            items = raw.get("Table", []) if isinstance(raw, dict) else []
+
+            if not items:
+                logger.warning(f"[{self.tag}] Empty Table array in response")
+                return
+
+            # Find the Index Futures row (PRODUCT_TYPE == "IF")
+            if_row = None
+            for item in items:
+                if item.get("PRODUCT_TYPE") == "IF":
+                    if_row = item
+                    break
+
+            if not if_row:
+                logger.warning(f"[{self.tag}] No IF (Index Futures) row found")
+                return
+
+            # Extract date from DT_TM field: "2026-02-27T15:29:59.6"
+            dt_tm = if_row.get("DT_TM", "")
+            date_key = None
+            if dt_tm:
+                try:
+                    dt = datetime.strptime(dt_tm[:10], "%Y-%m-%d")
+                    date_key = dt.strftime("%d%m%Y")
+                except ValueError:
+                    pass
+
+            if not date_key:
+                logger.warning(f"[{self.tag}] Could not extract date from DT_TM: {dt_tm}")
+                return
+
+            row = {
+                "BSE_IF_NO_OF_CONTRACTS": if_row.get("no_of_Contracts", 0),
+                "BSE_IF_TURNOVER": if_row.get("Turnover", 0),
+                "BSE_IF_NO_OF_TRADES": if_row.get("tot_no_of_trd", 0),
+            }
+
+            for k, v in row.items():
+                logger.info(f"[{self.tag}]   {k} = {v}")
+
+            self.cache[date_key] = row
+            logger.info(f"[{self.tag}] Stored 3 metrics for {date_key}")
+            self.save_cache()
+
+        except Exception as exc:
+            logger.error(f"[{self.tag}] Fetch error: {exc}")
+
+
+# ============================================================================
 # Combined CSV writer
 # ============================================================================
 def write_output(
     nse: Dict, bse: Dict, cat: Dict, eq_cat: Dict, mrg: Dict, part: Dict, tbg: Dict = None,
     nse_reg_inv: Dict = None, bse_reg_inv: Dict = None, mfss: Dict = None, turnover: Dict = None,
-    bse_turnover: Dict = None,
+    bse_turnover: Dict = None, bse_idx_deriv: Dict = None,
 ) -> None:
     if tbg is None:
         tbg = {}
@@ -1482,6 +1584,8 @@ def write_output(
         turnover = {}
     if bse_turnover is None:
         bse_turnover = {}
+    if bse_idx_deriv is None:
+        bse_idx_deriv = {}
     
     # Extract the single/latest investor count values (not date-keyed)
     # The caches contain a single entry with the date key of when it was fetched
@@ -1496,7 +1600,7 @@ def write_output(
         bse_reg_inv_count = next(iter(bse_reg_inv.values()), None) if bse_reg_inv else None
     
     all_dates = sorted(
-        set(nse) | set(bse) | set(cat) | set(eq_cat) | set(mrg) | set(part) | set(tbg) | set(mfss) | set(turnover) | set(bse_turnover),
+        set(nse) | set(bse) | set(cat) | set(eq_cat) | set(mrg) | set(part) | set(tbg) | set(mfss) | set(turnover) | set(bse_turnover) | set(bse_idx_deriv),
         key=lambda s: datetime.strptime(s, "%d%m%Y"),
     )
 
@@ -1519,6 +1623,8 @@ def write_output(
         "BSE_EQ_VOLUME", "BSE_EQ_TURNOVER_CR", "BSE_EQ_PREMIUM_TURNOVER", "BSE_EQ_NO_OF_TRADES", "BSE_EQ_NO_OF_ORDERS",
         "BSE_DERIV_VOLUME", "BSE_DERIV_TURNOVER_CR", "BSE_DERIV_PREMIUM_TURNOVER", "BSE_DERIV_NO_OF_TRADES", "BSE_DERIV_NO_OF_ORDERS",
         "BSE_STARMF_VOLUME", "BSE_STARMF_TURNOVER_CR", "BSE_STARMF_PREMIUM_TURNOVER", "BSE_STARMF_NO_OF_TRADES", "BSE_STARMF_NO_OF_ORDERS",
+        # BSE Index Derivatives Summary – Index Futures (3 columns)
+        "BSE_IF_NO_OF_CONTRACTS", "BSE_IF_TURNOVER", "BSE_IF_NO_OF_TRADES",
         # NSE TBG (Trading and Borrowing) Daily data (28 columns)
         "NSE_TBG_CM_NOS_OF_SECURITY_TRADES", "NSE_TBG_CM_NOS_OF_TRADES", "NSE_TBG_CM_TRADES_QTY", "NSE_TBG_CM_TRADES_VALUES",
         "NSE_TBG_FO_INDEX_FUT_QTY", "NSE_TBG_FO_INDEX_FUT_VAL", "NSE_TBG_FO_STOCK_FUT_QTY", "NSE_TBG_FO_STOCK_FUT_VAL",
@@ -1604,6 +1710,15 @@ def write_output(
                             row_data.append(f2(bt_data.get(f"{prefix}{suffix}")))
                 else:
                     row_data.extend([""] * 15)
+
+                # Add BSE Index Futures data (3 columns)
+                idx_data = bse_idx_deriv.get(ds)
+                if idx_data:
+                    row_data.append(fi(idx_data.get("BSE_IF_NO_OF_CONTRACTS")))
+                    row_data.append(f2(idx_data.get("BSE_IF_TURNOVER")))
+                    row_data.append(fi(idx_data.get("BSE_IF_NO_OF_TRADES")))
+                else:
+                    row_data.extend([""] * 3)
 
                 # Add NSE TBG daily data
                 if t:
@@ -1691,13 +1806,18 @@ def main() -> None:
         bse_turnover_collector = BSEMarketTurnoverCollector()
         bse_turnover_collector.collect()
 
+        # Collect BSE Index Derivatives Summary (Index Futures)
+        logger.info(f"\n--- BSE Index Derivatives Summary (Index Futures) ---")
+        bse_idx_deriv_collector = BSEIdxDerivSummaryCollector()
+        bse_idx_deriv_collector.collect()
+
         # Collect registered investors data
         logger.info(f"\n--- Registered Investors ---")
         nse_reg_inv_cache, bse_reg_inv_cache = collect_registered_investors()
 
         logger.info("\n--- Writing combined output ---")
         nse, bse, cat, eq_cat, mrg, part = [c.cache for c in collectors]
-        write_output(nse, bse, cat, eq_cat, mrg, part, tbg_collector.cache, nse_reg_inv_cache, bse_reg_inv_cache, mfss_collector.cache, turnover_collector.cache, bse_turnover_collector.cache)
+        write_output(nse, bse, cat, eq_cat, mrg, part, tbg_collector.cache, nse_reg_inv_cache, bse_reg_inv_cache, mfss_collector.cache, turnover_collector.cache, bse_turnover_collector.cache, bse_idx_deriv_collector.cache)
         logger.info("All done.")
 
     except KeyboardInterrupt:
