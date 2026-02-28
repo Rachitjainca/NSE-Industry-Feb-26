@@ -1273,13 +1273,19 @@ class MarketTurnoverCollector:
             resp = session.get(NSE_MARKET_TURNOVER_API, timeout=REQUEST_TIMEOUT)
             
             if resp.status_code == 200:
-                data = resp.json()
-                # API returns a flat list of segment objects
+                raw = resp.json()
+                # API returns {"data": {"data": [...], "timeStamp": "..."}}
+                # Navigate to the inner list: raw["data"]["data"]
                 items = []
-                if isinstance(data, list):
-                    items = data
-                elif isinstance(data, dict) and "data" in data:
-                    items = data["data"] if isinstance(data["data"], list) else []
+                if isinstance(raw, list):
+                    items = raw
+                elif isinstance(raw, dict):
+                    inner = raw.get("data", raw)
+                    if isinstance(inner, dict):
+                        items = inner.get("data", [])
+                    elif isinstance(inner, list):
+                        items = inner
+                logger.info(f"[{self.tag}] Parsed {len(items)} segments from API response")
                 
                 if items:
                     # Extract date from updatedOn field of first item
