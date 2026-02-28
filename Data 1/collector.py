@@ -105,6 +105,10 @@ NSE_MFSS_CACHE = "nse_mfss_cache.json"
 NSE_MARKET_TURNOVER_API = "https://www.nseindia.com/api/NextApi/apiClient?functionName=getMarketTurnover"
 NSE_MARKET_TURNOVER_CACHE = "nse_market_turnover_cache.json"
 
+# ── BSE Market Turnover API ──────────────────────────────────────────────────
+BSE_MARKET_TURNOVER_API = "https://api.bseindia.com/BseIndiaAPI/api/MTurnover/w"
+BSE_MARKET_TURNOVER_CACHE = "bse_market_turnover_cache.json"
+
 # ── BSE column indices (0-based) in MS_<date>-01.csv ────────────────────────
 BSE_COL_TTL_QTY   = 15
 BSE_COL_TTL_VAL   = 16
@@ -1339,11 +1343,132 @@ class MarketTurnoverCollector:
             logger.error(f"[{self.tag}] Fetch error: {exc}")
 
 # ============================================================================
+# BSE Market Turnover (Equity, Derivatives, StAR MF)
+# ============================================================================
+class BSEMarketTurnoverCollector:
+    """Fetches BSE Market Turnover data (Volume, Turnover, Premium Turnover, Trades, Orders)."""
+
+    # Segments to capture and their column prefixes
+    SEGMENTS = {
+        "Equity":       "BSE_EQ",
+        "Derivatives":  "BSE_DERIV",
+        "BSE StAR MF":  "BSE_STARMF",
+    }
+    # Fields to extract from each segment
+    FIELDS = ["Volume", "Turnover", "PermiumTurnover", "NoOfTrades", "NoOfOrders"]
+    # Friendly suffixes for the CSV columns
+    FIELD_SUFFIXES = ["_VOLUME", "_TURNOVER_CR", "_PREMIUM_TURNOVER", "_NO_OF_TRADES", "_NO_OF_ORDERS"]
+
+    def __init__(self):
+        self.tag = "BSE_TURNOVER"
+        self.cache_file = BSE_MARKET_TURNOVER_CACHE
+        self.cache: Dict = {}
+        self.load_cache()
+
+    def load_cache(self) -> None:
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, encoding="utf-8") as f:
+                    self.cache = json.load(f)
+                logger.info(f"[{self.tag}] Cache loaded: {len(self.cache)} entries")
+            except Exception as exc:
+                logger.warning(f"[{self.tag}] Cache load error: {exc}")
+                self.cache = {}
+
+    def save_cache(self) -> None:
+        try:
+            with open(self.cache_file, "w", encoding="utf-8") as f:
+                json.dump(self.cache, f, indent=2)
+            logger.info(f"[{self.tag}] Cache saved: {len(self.cache)} entries")
+        except Exception as exc:
+            logger.error(f"[{self.tag}] Cache save error: {exc}")
+
+    @staticmethod
+    def _parse_indian_number(val: str) -> Optional[float]:
+        """Parse Indian comma-formatted number string to float. Returns None for '-' or empty."""
+        if not val or val.strip() == "-":
+            return None
+        try:
+            return float(val.replace(",", ""))
+        except (ValueError, TypeError):
+            return None
+
+    def collect(self) -> None:
+        """Fetch BSE Market Turnover from API."""
+        logger.info(f"[{self.tag}] Fetching BSE Market Turnover...")
+
+        try:
+            session = requests.Session()
+            session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://www.bseindia.com/",
+                "Origin": "https://www.bseindia.com",
+            })
+
+            resp = session.get(BSE_MARKET_TURNOVER_API, timeout=REQUEST_TIMEOUT)
+
+            if resp.status_code != 200:
+                logger.error(f"[{self.tag}] API returned {resp.status_code}")
+                return
+
+            raw = resp.json()
+            items = raw.get("Data", []) if isinstance(raw, dict) else []
+
+            if not items:
+                logger.warning(f"[{self.tag}] Empty Data array in response")
+                return
+
+            # Build a lookup: HeaderName -> item
+            by_name = {item.get("HeaderName", ""): item for item in items}
+
+            # Extract date from the first matching segment's Ason field
+            date_key = None
+            for seg_name in self.SEGMENTS:
+                item = by_name.get(seg_name)
+                if item:
+                    ason = (item.get("Ason") or "").strip()
+                    if ason and ason != "-":
+                        # Format: "27/02/26 | 16:00 IST"  →  parse the date part
+                        date_part = ason.split("|")[0].strip()
+                        try:
+                            dt = datetime.strptime(date_part, "%d/%m/%y")
+                            date_key = dt.strftime("%d%m%Y")
+                            break
+                        except ValueError:
+                            pass
+
+            if not date_key:
+                logger.warning(f"[{self.tag}] Could not extract date from Ason fields")
+                return
+
+            row: Dict = {}
+            for seg_name, prefix in self.SEGMENTS.items():
+                item = by_name.get(seg_name)
+                if not item:
+                    logger.warning(f"[{self.tag}]   Segment '{seg_name}' not found in response")
+                    continue
+                for field, suffix in zip(self.FIELDS, self.FIELD_SUFFIXES):
+                    val = self._parse_indian_number(item.get(field, "-"))
+                    col = f"{prefix}{suffix}"
+                    row[col] = val
+                    logger.info(f"[{self.tag}]   {seg_name}.{field} → {col} = {val}")
+
+            self.cache[date_key] = row
+            logger.info(f"[{self.tag}] Stored {len(row)} metrics for {date_key}")
+            self.save_cache()
+
+        except Exception as exc:
+            logger.error(f"[{self.tag}] Fetch error: {exc}")
+
+
+# ============================================================================
 # Combined CSV writer
 # ============================================================================
 def write_output(
     nse: Dict, bse: Dict, cat: Dict, eq_cat: Dict, mrg: Dict, part: Dict, tbg: Dict = None,
-    nse_reg_inv: Dict = None, bse_reg_inv: Dict = None, mfss: Dict = None, turnover: Dict = None
+    nse_reg_inv: Dict = None, bse_reg_inv: Dict = None, mfss: Dict = None, turnover: Dict = None,
+    bse_turnover: Dict = None,
 ) -> None:
     if tbg is None:
         tbg = {}
@@ -1355,6 +1480,8 @@ def write_output(
         mfss = {}
     if turnover is None:
         turnover = {}
+    if bse_turnover is None:
+        bse_turnover = {}
     
     # Extract the single/latest investor count values (not date-keyed)
     # The caches contain a single entry with the date key of when it was fetched
@@ -1369,7 +1496,7 @@ def write_output(
         bse_reg_inv_count = next(iter(bse_reg_inv.values()), None) if bse_reg_inv else None
     
     all_dates = sorted(
-        set(nse) | set(bse) | set(cat) | set(eq_cat) | set(mrg) | set(part) | set(tbg) | set(mfss) | set(turnover),
+        set(nse) | set(bse) | set(cat) | set(eq_cat) | set(mrg) | set(part) | set(tbg) | set(mfss) | set(turnover) | set(bse_turnover),
         key=lambda s: datetime.strptime(s, "%d%m%Y"),
     )
 
@@ -1388,6 +1515,10 @@ def write_output(
         # NSE Market Turnover - Daily Orders: Totals for Equities, EqDerivatives, CommodityDerivatives + MF (5 columns)
         "NSE_EQUITY_TOTAL_NO_OF_ORDERS", "NSE_FO_TOTAL_NO_OF_ORDERS", "NSE_COMMODITY_TOTAL_NO_OF_ORDERS",
         "NSE_MF_NO_OF_ORDERS", "NSE_MF_NOTIONAL_TURNOVER",
+        # BSE Market Turnover – Equity (5 cols), Derivatives (5 cols), StAR MF (5 cols) = 15 columns
+        "BSE_EQ_VOLUME", "BSE_EQ_TURNOVER_CR", "BSE_EQ_PREMIUM_TURNOVER", "BSE_EQ_NO_OF_TRADES", "BSE_EQ_NO_OF_ORDERS",
+        "BSE_DERIV_VOLUME", "BSE_DERIV_TURNOVER_CR", "BSE_DERIV_PREMIUM_TURNOVER", "BSE_DERIV_NO_OF_TRADES", "BSE_DERIV_NO_OF_ORDERS",
+        "BSE_STARMF_VOLUME", "BSE_STARMF_TURNOVER_CR", "BSE_STARMF_PREMIUM_TURNOVER", "BSE_STARMF_NO_OF_TRADES", "BSE_STARMF_NO_OF_ORDERS",
         # NSE TBG (Trading and Borrowing) Daily data (28 columns)
         "NSE_TBG_CM_NOS_OF_SECURITY_TRADES", "NSE_TBG_CM_NOS_OF_TRADES", "NSE_TBG_CM_TRADES_QTY", "NSE_TBG_CM_TRADES_VALUES",
         "NSE_TBG_FO_INDEX_FUT_QTY", "NSE_TBG_FO_INDEX_FUT_VAL", "NSE_TBG_FO_STOCK_FUT_QTY", "NSE_TBG_FO_STOCK_FUT_VAL",
@@ -1465,6 +1596,15 @@ def write_output(
                     # Fill with empty strings if no Market Turnover data
                     row_data.extend([""] * 5)
                 
+                # Add BSE Market Turnover data (15 columns)
+                bt_data = bse_turnover.get(ds)
+                if bt_data:
+                    for prefix in ["BSE_EQ", "BSE_DERIV", "BSE_STARMF"]:
+                        for suffix in ["_VOLUME", "_TURNOVER_CR", "_PREMIUM_TURNOVER", "_NO_OF_TRADES", "_NO_OF_ORDERS"]:
+                            row_data.append(f2(bt_data.get(f"{prefix}{suffix}")))
+                else:
+                    row_data.extend([""] * 15)
+
                 # Add NSE TBG daily data
                 if t:
                     row_data.extend([
@@ -1546,13 +1686,18 @@ def main() -> None:
         turnover_collector = MarketTurnoverCollector()
         turnover_collector.collect()
 
+        # Collect BSE Market Turnover data
+        logger.info(f"\n--- BSE Market Turnover (Equity/Derivatives/StAR MF) ---")
+        bse_turnover_collector = BSEMarketTurnoverCollector()
+        bse_turnover_collector.collect()
+
         # Collect registered investors data
         logger.info(f"\n--- Registered Investors ---")
         nse_reg_inv_cache, bse_reg_inv_cache = collect_registered_investors()
 
         logger.info("\n--- Writing combined output ---")
         nse, bse, cat, eq_cat, mrg, part = [c.cache for c in collectors]
-        write_output(nse, bse, cat, eq_cat, mrg, part, tbg_collector.cache, nse_reg_inv_cache, bse_reg_inv_cache, mfss_collector.cache, turnover_collector.cache)
+        write_output(nse, bse, cat, eq_cat, mrg, part, tbg_collector.cache, nse_reg_inv_cache, bse_reg_inv_cache, mfss_collector.cache, turnover_collector.cache, bse_turnover_collector.cache)
         logger.info("All done.")
 
     except KeyboardInterrupt:
