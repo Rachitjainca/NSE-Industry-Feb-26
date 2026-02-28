@@ -1311,11 +1311,23 @@ class MarketTurnoverCollector:
                                     orders_data["COMMODITY_TOTAL_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
                         
                         # Mutual Funds - noOfOrders and notionalTurnover
-                        if "mutualFunds" in market_data:
-                            for item in market_data["mutualFunds"]:
-                                if item.get("instrument") == "Mutual Funds":
+                        # Try multiple possible key names and instrument names
+                        mf_key = None
+                        for candidate in ["mutualFunds", "mutualfunds", "MutualFunds", "mfss"]:
+                            if candidate in market_data:
+                                mf_key = candidate
+                                break
+                        
+                        if mf_key:
+                            logger.info(f"[{self.tag}] Found MF key: '{mf_key}' with {len(market_data[mf_key])} items")
+                            for item in market_data[mf_key]:
+                                logger.info(f"[{self.tag}]   MF item: instrument='{item.get('instrument', 'N/A')}' orders={item.get('noOfOrders', 'N/A')} turnover={item.get('notionalTurnover', 'N/A')}")
+                                inst = item.get("instrument", "").lower()
+                                if "mutual" in inst or "mf" in inst or "total" in inst or inst == "":
                                     orders_data["MF_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
                                     orders_data["MF_NOTIONAL_TURNOVER"] = item.get("notionalTurnover", 0)
+                        else:
+                            logger.warning(f"[{self.tag}] No mutualFunds key found. Available keys: {list(market_data.keys())}")
                         
                         # Store in cache (overwrite today's data if it exists)
                         self.cache[date_key] = orders_data
