@@ -37,29 +37,43 @@ jobs:
         run: |
           echo '${{ secrets.GSHEET_SERVICE_ACCOUNT }}' > groww-data-488513-384d7e65fa4f.json
 
-      # ── 5. Run the data collector ─────────────────────────────────────────────
+      # ── 5. Run the main NSE + BSE data collector ──────────────────────────────
       - name: Collect NSE + BSE data
-        run: python collector.py
+        run: python Data\ 1/collector.py
 
-      # ── 6. Push CSV → Google Sheets ───────────────────────────────────────────
+      # ── 6. Run the TBG data collector ──────────────────────────────────────────
+      - name: Collect TBG data (Daily FO, Commodity, CM - Daily & Monthly)
+        run: python Data\ 1/TBG/tbg_collector.py
+
+      # ── 7. Push CSV → Google Sheets ────────────────────────────────────────────
       - name: Upload to Google Sheets
-        run: python gsheet_upload.py
+        run: python Data\ 1/gsheet_upload.py
 
-      # ── 7. Commit updated caches + CSV back to the repo ──────────────────────
+      # ── 8. Commit updated caches + CSVs back to the repo ─────────────────────
       - name: Commit & push updated cache files
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add \
-            nse_fo_cache.json \
-            bse_fo_cache.json \
-            nse_cat_cache.json \
-            nse_eq_cat_cache.json \
-            nse_mrg_cache.json \
-            nse_part_cache.json \
-            nse_fo_aggregated_data.csv \
-            collector.log || true
+            Data\ 1/nse_fo_cache.json \
+            Data\ 1/bse_fo_cache.json \
+            Data\ 1/nse_cat_cache.json \
+            Data\ 1/nse_eq_cat_cache.json \
+            Data\ 1/nse_mrg_cache.json \
+            Data\ 1/nse_part_cache.json \
+            Data\ 1/nse_mfss_cache.json \
+            Data\ 1/tbg_daily_fo_cache.json \
+            Data\ 1/tbg_daily_com_cache.json \
+            Data\ 1/tbg_monthly_cm_cache.json \
+            Data\ 1/reg_investors_cache/nse_reg_investors_cache.json \
+            Data\ 1/reg_investors_cache/bse_reg_investors_cache.json \
+            Data\ 1/nse_fo_aggregated_data.csv \
+            Data\ 1/nse_tbg_daily_fo.csv \
+            Data\ 1/nse_tbg_daily_com.csv \
+            Data\ 1/nse_tbg_monthly_cm.csv \
+            Data\ 1/collector.log \
+            Data\ 1/tbg_collector.log || true
           # only commit when there are actual changes
           git diff --staged --quiet || \
-            git commit -m "chore: auto-update data $(date +'%Y-%m-%d')"
+            git commit -m "chore: auto-update NSE/BSE/TBG data with Reg Investors $(date +'%Y-%m-%d')"
           git push

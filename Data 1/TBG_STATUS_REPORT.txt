@@ -1,0 +1,147 @@
+================================================================================
+TBG DATA COLLECTION - FINAL STATUS REPORT
+================================================================================
+
+Date: 28-Feb-2026
+Status: ✅ OPERATIONAL
+
+================================================================================
+PROBLEM SOLVED
+================================================================================
+
+Root Cause: 
+  Identified and fixed TBG API communication failures caused by:
+  - Lack of session persistence (requests.Session not used)
+  - No retry strategy for transient failures
+  - Missing browser-like headers
+  - Insufficient timeout values
+
+Solution Implemented:
+  - Added HTTPAdapter with Retry strategy (3 retries, 0.5s backoff)
+  - Configured browser-like headers (User-Agent, Accept, Referer)
+  - Increased timeout from 3s to 15s
+  - Used persistent session management
+
+================================================================================
+DATA COLLECTION RESULTS
+================================================================================
+
+Total Trading Days Collected: 267 days (Jan 2025 - Feb 2026)
+
+CASH MARKET (CM) DATA:
+  ✅ Status: FULLY OPERATIONAL
+  ✅ Records: 267/267 rows have data
+  ✅ Columns: 4 metrics per trading day
+     - NSE_TBG_CM_NOS_OF_SECURITY_TRADES (trades count)
+     - NSE_TBG_CM_NOS_OF_TRADES (total trades)
+     - NSE_TBG_CM_TRADES_QTY (quantity traded)
+     - NSE_TBG_CM_TRADES_VALUES (value traded)
+
+DERIVATIVES (FO) DATA:
+  ⚠️ Status: NO DATA AVAILABLE FROM API
+  ⚠️ Reason: NSE endpoints return empty arrays for all months
+  ℹ️ 16 columns configured but empty (API limitation)
+
+COMMODITY DERIVATIVES (COMDER) DATA:
+  ⚠️ Status: NO DATA AVAILABLE FROM API
+  ⚠️ Reason: NSE endpoints return empty arrays for all months
+  ℹ️ 7 columns configured but empty (API limitation)
+
+CSV Output:
+  File: nse_fo_aggregated_data.csv
+  Rows: 267
+  Columns: 61 (includes 27 TBG columns)
+  Status: ✅ All available TBG data populated
+
+================================================================================
+CODE MODIFICATIONS
+================================================================================
+
+File: collector.py (TBGDailyCollector class)
+
+1. Added Session Management:
+   - New method: _setup_session()
+   - Creates persistent HTTPAdapter with retry strategy
+   - Configures browser-like headers
+
+2. Updated API Calls:
+   - Method: fetch_segment_data()
+   - Changed from requests.get() → self.session.get()
+   - Increased timeout from 3s → 15s
+
+3. Improved Data Extraction:
+   - New method: extract_record_data()
+   - Handles nested "data" key in API responses
+   - Supports multiple date field name variations
+
+4. Updated Field Name Mapping:
+   - CM: Uses actual API names (CDT_NOS_OF_SECURITY_TRADES, etc.)
+   - FO: Configured for Index/Stock Futures/Options (when data available)
+   - COMDER: Configured for commodity futures/options (when data available)
+
+================================================================================
+API ENDPOINT BEHAVIOR
+================================================================================
+
+Endpoints Tested:
+  1. https://www.nseindia.com/api/historicalOR/cm/tbg/daily
+     Parameters: month=Feb, year=26
+     Status: ✅ 200 OK - Returns 21 trading day records
+
+  2. https://www.nseindia.com/api/historicalOR/fo/tbg/daily
+     Parameters: month=Feb, year=26
+     Status: ✅ 200 OK - Returns empty array (no data)
+
+  3. https://www.nseindia.com/api/historicalOR/comder/tbg/daily
+     Parameters: month=Feb, year=26
+     Status: ✅ 200 OK - Returns empty array (no data)
+
+Response Structure:
+  CM Endpoint: Nested structure with "data" key at record level
+  FO/COMDER: Direct arrays (empty)
+
+================================================================================
+7 PM SCHEDULER INTEGRATION
+================================================================================
+
+Scheduler File: run_daily_7pm.bat
+Status: ✅ Ready to deploy
+
+Setup Instructions:
+  1. Open Windows Task Scheduler (taskschd.msc)
+  2. Create Basic Task
+  3. Name: "NSE BSE Daily Market Data Collection 7PM"
+  4. Trigger: Daily at 19:00 (7:00 PM)
+  5. Action: Start a program
+  6. Program: cmd.exe
+  7. Arguments: /c "run_daily_7pm.bat"
+  8. Start in: <NSE BSE Latest folder path>
+
+Workflow:
+  1. collector.py runs and updates all market data (including TBG)
+  2. Google Sheets upload (gsheet_upload.py) syncs data
+  3. Email notification sent on completion
+
+================================================================================
+VERIFICATION RESULTS
+================================================================================
+
+CM Data Samples (Feb 2026):
+  27-Feb: 34,269,344 trades
+  26-Feb: 30,748,283 trades
+  25-Feb: 31,214,021 trades
+
+Expected in Google Sheets:
+  All 267 trading days with 4 TBG CM columns populated
+  FO/COMDER columns will remain empty (API limitation)
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. ✅ CM TBG data is fully operational
+2. ⏳ Deploy 7 PM scheduler task on Windows Task Scheduler
+3. ⏳ Monitor first run to verify Google Sheets syncs correctly
+4. ℹ️ Consider contacting NSE about FO/COMDER TBG data availability
+
+================================================================================

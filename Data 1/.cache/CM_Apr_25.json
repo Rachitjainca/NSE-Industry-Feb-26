@@ -1,0 +1,214 @@
+{
+  "data": [
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "30-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-29T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2966,
+        "CDT_NOS_OF_TRADES": 35895122,
+        "CDT_TRADES_QTY": 30666.42,
+        "CDT_TRADES_VALUES": 110087.58
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "29-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-28T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2970,
+        "CDT_NOS_OF_TRADES": 32358970,
+        "CDT_TRADES_QTY": 31128.3,
+        "CDT_TRADES_VALUES": 102696.54
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "28-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-27T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 3023,
+        "CDT_NOS_OF_TRADES": 32746674,
+        "CDT_TRADES_QTY": 29841.48,
+        "CDT_TRADES_VALUES": 90099.31
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "25-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-24T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2982,
+        "CDT_NOS_OF_TRADES": 41760700,
+        "CDT_TRADES_QTY": 53726.66,
+        "CDT_TRADES_VALUES": 113850.06
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "24-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-23T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2967,
+        "CDT_NOS_OF_TRADES": 34965348,
+        "CDT_TRADES_QTY": 37356.89,
+        "CDT_TRADES_VALUES": 108518.96
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "23-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-22T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2970,
+        "CDT_NOS_OF_TRADES": 36725395,
+        "CDT_TRADES_QTY": 39084.93,
+        "CDT_TRADES_VALUES": 116245.44
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "22-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-21T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 3021,
+        "CDT_NOS_OF_TRADES": 35851927,
+        "CDT_TRADES_QTY": 41710.1,
+        "CDT_TRADES_VALUES": 109084.29
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "21-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-20T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 3053,
+        "CDT_NOS_OF_TRADES": 37284548,
+        "CDT_TRADES_QTY": 45679.54,
+        "CDT_TRADES_VALUES": 105396.09
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "17-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-16T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 3015,
+        "CDT_NOS_OF_TRADES": 35780070,
+        "CDT_TRADES_QTY": 36200.72,
+        "CDT_TRADES_VALUES": 102749.6
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "16-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-15T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 3010,
+        "CDT_NOS_OF_TRADES": 34334414,
+        "CDT_TRADES_QTY": 34206.17,
+        "CDT_TRADES_VALUES": 92099.85
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "15-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-14T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 3053,
+        "CDT_NOS_OF_TRADES": 36664108,
+        "CDT_TRADES_QTY": 34118.63,
+        "CDT_TRADES_VALUES": 101771.39
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "11-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-10T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2993,
+        "CDT_NOS_OF_TRADES": 35265309,
+        "CDT_TRADES_QTY": 32761.56,
+        "CDT_TRADES_VALUES": 94849.81
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "09-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-08T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2940,
+        "CDT_NOS_OF_TRADES": 31960807,
+        "CDT_TRADES_QTY": 28264.34,
+        "CDT_TRADES_VALUES": 80976.59
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "08-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-07T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2976,
+        "CDT_NOS_OF_TRADES": 35089559,
+        "CDT_TRADES_QTY": 33052.64,
+        "CDT_TRADES_VALUES": 94247.4
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "07-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-06T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 3057,
+        "CDT_NOS_OF_TRADES": 52721588,
+        "CDT_TRADES_QTY": 46361.42,
+        "CDT_TRADES_VALUES": 124335.3
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "04-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-03T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2968,
+        "CDT_NOS_OF_TRADES": 39174450,
+        "CDT_TRADES_QTY": 37733.3,
+        "CDT_TRADES_VALUES": 103513.15
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "03-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-02T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2992,
+        "CDT_NOS_OF_TRADES": 33239388,
+        "CDT_TRADES_QTY": 35796.05,
+        "CDT_TRADES_VALUES": 90488.87
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "02-Apr-2025",
+        "CDT_DATE_ORDER": "2025-04-01T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 2999,
+        "CDT_NOS_OF_TRADES": 29342992,
+        "CDT_TRADES_QTY": 35502.16,
+        "CDT_TRADES_VALUES": 79816.05
+      }
+    },
+    {
+      "data": {
+        "TYPE": "daily",
+        "F_TIMESTAMP": "01-Apr-2025",
+        "CDT_DATE_ORDER": "2025-03-31T18:30:00.000+00:00",
+        "CDT_NOS_OF_SECURITY_TRADES": 3014,
+        "CDT_NOS_OF_TRADES": 32428622,
+        "CDT_TRADES_QTY": 50641.27,
+        "CDT_TRADES_VALUES": 85431
+      }
+    }
+  ],
+  "cached_at": "2026-02-28T12:25:37.160435"
+}

@@ -13,22 +13,29 @@ venv/
 .venv/
 env/
 
-# Temporary download cache
+# Generated data & cache files (regenerated on each run)
+*.json.cache
+*_cache.json
+# NOTE: nse_fo_aggregated_data.csv is KEPT (main output)
+# NOTE: nse_tbg_daily_consolidated.csv is KEPT (data source)
+# NOTE: reg_investors_cache/ is KEPT (historical data)
+reg_investors_cache_temp/
+
+# Generated logs (runtime)
+*.log
+collector.log
+scheduler.log
+
+# Service account keys — stored as GitHub Secrets, never commit
+*service-account*.json
+groww-data*.json
+*credentials*.json
+
+# Temporary files
 temp_nse_downloads/
-
-# Service account key — stored as GitHub Secret, never commit
-groww-data-488513-384d7e65fa4f.json
-
-# Temp probe scripts
 temp_fetch_missing.py
 temp_nse_cat_probe.py
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Runtime log (committed for audit trail)
-# collector.log
-
-# VS Code
-.vscode/
