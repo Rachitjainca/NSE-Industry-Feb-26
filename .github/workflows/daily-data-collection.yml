@@ -9,6 +9,8 @@ on:
 jobs:
   collect-and-sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
       # Step 1: Checkout repository
