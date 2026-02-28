@@ -26,10 +26,9 @@ jobs:
       # Step 3: Install dependencies
       - name: Install dependencies
         run: |
+          cd "Data 1"
           python -m pip install --upgrade pip
-          pwd
-          ls -la
-          pip install -r Data\ 1/requirements.txt
+          pip install -r requirements.txt
       
       # Step 4: Create Google Sheets credentials file
       - name: Create Google Sheets credentials
