@@ -102,7 +102,7 @@ NSE_MFSS_API = "https://www.nseindia.com/api/historicalOR/mfssTradeStatisticsDat
 NSE_MFSS_CACHE = "nse_mfss_cache.json"
 
 # ── NSE Market Turnover Summary (Orders) API ────────────────────────────────
-NSE_MARKET_TURNOVER_API = "https://www.nseindia.com/api/NextApi/apiClient?functionName=getMarketTurnoverSummary"
+NSE_MARKET_TURNOVER_API = "https://www.nseindia.com/api/NextApi/apiClient?functionName=getMarketTurnover"
 NSE_MARKET_TURNOVER_CACHE = "nse_market_turnover_cache.json"
 
 # ── BSE column indices (0-based) in MS_<date>-01.csv ────────────────────────
@@ -1250,8 +1250,8 @@ class MarketTurnoverCollector:
             logger.error(f"[{self.tag}] Cache save error: {exc}")
 
     def collect(self) -> None:
-        """Fetch Market Turnover Summary from API and cache only Equities, Equity Derivatives, and Commodity Derivatives orders."""
-        logger.info(f"[{self.tag}] Fetching Market Turnover Summary (Equities, EqDerivs, CommodityDerivs orders)...")
+        """Fetch Market Turnover from getMarketTurnover API — flat list with segment-based items."""
+        logger.info(f"[{self.tag}] Fetching Market Turnover (getMarketTurnover API)...")
         
         try:
             session = requests.Session()
@@ -1274,69 +1274,58 @@ class MarketTurnoverCollector:
             
             if resp.status_code == 200:
                 data = resp.json()
-                if "data" in data:
-                    market_data = data["data"]
-                    
-                    # Extract timestamp from any segment (they all have the same timestamp)
+                # API returns a flat list of segment objects
+                items = []
+                if isinstance(data, list):
+                    items = data
+                elif isinstance(data, dict) and "data" in data:
+                    items = data["data"] if isinstance(data["data"], list) else []
+                
+                if items:
+                    # Extract date from updatedOn field of first item
                     date_key = None
-                    if "equities" in market_data and market_data["equities"]:
-                        ts = market_data["equities"][0].get("mktTimeStamp", "")
+                    for item in items:
+                        ts = item.get("updatedOn", "")
                         if ts:
                             try:
                                 date_obj = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
                                 date_key = date_obj.strftime("%d%m%Y")
+                                break
                             except ValueError:
                                 pass
                     
                     if date_key:
-                        # Extract ONLY TOTAL noOfOrders for Equities, EqDerivatives, CommodityDerivatives + MF metrics
                         orders_data = {}
                         
-                        # Equities - Total only
-                        if "equities" in market_data:
-                            for item in market_data["equities"]:
-                                if item.get("instrument") == "Total":
-                                    orders_data["EQUITY_TOTAL_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
-                        
-                        # Equity Derivatives - Total only
-                        if "equityDerivatives" in market_data:
-                            for item in market_data["equityDerivatives"]:
-                                if item.get("instrument") == "Total":
-                                    orders_data["FO_TOTAL_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
-                        
-                        # Commodity Derivatives - Total only
-                        if "commodityDerivatives" in market_data:
-                            for item in market_data["commodityDerivatives"]:
-                                if item.get("instrument") == "Total":
-                                    orders_data["COMMODITY_TOTAL_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
-                        
-                        # Mutual Funds - noOfOrders and notionalTurnover
-                        # Try multiple possible key names and instrument names
-                        mf_key = None
-                        for candidate in ["mutualFunds", "mutualfunds", "MutualFunds", "mfss"]:
-                            if candidate in market_data:
-                                mf_key = candidate
-                                break
-                        
-                        if mf_key:
-                            logger.info(f"[{self.tag}] Found MF key: '{mf_key}' with {len(market_data[mf_key])} items")
-                            for item in market_data[mf_key]:
-                                logger.info(f"[{self.tag}]   MF item: instrument='{item.get('instrument', 'N/A')}' orders={item.get('noOfOrders', 'N/A')} turnover={item.get('notionalTurnover', 'N/A')}")
-                                inst = item.get("instrument", "").lower()
-                                if "mutual" in inst or "mf" in inst or "total" in inst or inst == "":
-                                    orders_data["MF_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
-                                    orders_data["MF_NOTIONAL_TURNOVER"] = item.get("notionalTurnover", 0)
-                        else:
-                            logger.warning(f"[{self.tag}] No mutualFunds key found. Available keys: {list(market_data.keys())}")
+                        # Segment name mapping
+                        for item in items:
+                            seg = (item.get("segment") or "").strip()
+                            seg_lower = seg.lower()
+                            
+                            if "equit" in seg_lower and "deriv" not in seg_lower:
+                                # Equities / Cash Market
+                                orders_data["EQUITY_TOTAL_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
+                            elif "equity" in seg_lower and "deriv" in seg_lower:
+                                # Equity Derivatives / F&O
+                                orders_data["FO_TOTAL_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
+                            elif "commodity" in seg_lower:
+                                # Commodity Derivatives
+                                orders_data["COMMODITY_TOTAL_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
+                            elif "mutual" in seg_lower or "mf" in seg_lower:
+                                # Mutual Fund
+                                orders_data["MF_NO_OF_ORDERS"] = item.get("noOfOrders", 0)
+                                orders_data["MF_NOTIONAL_TURNOVER"] = item.get("totalValue", 0)
+                            
+                            logger.info(f"[{self.tag}]   segment='{seg}' orders={item.get('noOfOrders',0)} value={item.get('totalValue',0)}")
                         
                         # Store in cache (overwrite today's data if it exists)
                         self.cache[date_key] = orders_data
-                        logger.info(f"[{self.tag}] Fetched {len(orders_data)} order metrics for {date_key}")
+                        logger.info(f"[{self.tag}] Fetched {len(orders_data)} metrics for {date_key}")
                         self.save_cache()
                     else:
                         logger.warning(f"[{self.tag}] Could not extract date from response")
                 else:
-                    logger.warning(f"[{self.tag}] Unexpected response format")
+                    logger.warning(f"[{self.tag}] Empty or unexpected response format")
             else:
                 logger.error(f"[{self.tag}] API returned {resp.status_code}")
         
