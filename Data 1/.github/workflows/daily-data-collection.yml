@@ -1,0 +1,81 @@
+name: Daily NSE-BSE Data Collection
+
+on:
+  schedule:
+    # Run daily at 7:00 PM IST (1:30 PM UTC)
+    - cron: '30 13 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  collect-and-sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pandas gspread google-auth-oauthlib openpyxl xlrd
+      
+      # Step 4: Create Google Sheets credentials file
+      - name: Create Google Sheets credentials
+        run: |
+          mkdir -p "$(pwd)"
+          echo '${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}' > nse-industry-data-88d157be9048.json
+      
+      # Step 5: Run data collection
+      - name: Run data collector
+        run: |
+          cd "Data 1"
+          python collector.py
+        continue-on-error: true
+      
+      # Step 6: Run Google Sheets upload
+      - name: Upload to Google Sheets
+        run: |
+          cd "Data 1"
+          python gsheet_upload.py
+        continue-on-error: true
+      
+      # Step 7: Commit and push updated data
+      - name: Commit and push changes
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add "Data 1/nse_fo_aggregated_data.csv"
+          git add "Data 1/execution.log" || true
+          git add "Data 1/collector.log" || true
+          
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "✓ Daily data sync at $(date +'%Y-%m-%d %H:%M')"
+            git push origin main --force
+          fi
+        continue-on-error: true
+      
+      # Step 8: Report status
+      - name: Report execution status
+        if: always()
+        run: |
+          echo "=== Daily Data Collection Workflow ==="
+          echo "Time: $(date +'%Y-%m-%d %H:%M:%S')"
+          echo "Status: Completed"
+          cd "Data 1"
+          if [ -f "nse_fo_aggregated_data.csv" ]; then
+            ROWS=$(wc -l < nse_fo_aggregated_data.csv)
+            echo "Data rows: $ROWS"
+          fi
