@@ -1050,10 +1050,10 @@ class TBGDailyCollector:
                 merged["FO_STOCK_OPT_PREM_VAL"] = fo.get("Stock_Options_PREM_VAL", fo.get("STOCK_OPT_PREM_VAL", 0))
                 merged["FO_STOCK_OPT_PUT_CALL_RATIO"] = fo.get("Stock_Options_PUT_CALL_RATIO", fo.get("STOCK_OPT_PUT_CALL_RATIO", 0))
                 # FO Totals
-                merged["FO_TOTAL_FO_QTY"] = fo.get("Total_FO_QTY", fo.get("TOTAL_FO_QTY", 0))
-                merged["FO_TOTAL_FO_VAL"] = fo.get("Total_FO_VAL", fo.get("TOTAL_FO_VAL", 0))
+                merged["FO_TOTAL_FO_QTY"] = fo.get("F&O_Total_QTY", fo.get("Total_FO_QTY", fo.get("TOTAL_FO_QTY", 0)))
+                merged["FO_TOTAL_FO_VAL"] = fo.get("F&O_Total_VAL", fo.get("Total_FO_VAL", fo.get("TOTAL_FO_VAL", 0)))
                 merged["FO_TOTAL_TRADED_PREM_VAL"] = fo.get("Total_Traded_PREM_VAL", fo.get("TOTAL_TRADED_PREM_VAL", 0))
-                merged["FO_TOTAL_PUT_CALL_RATIO"] = fo.get("Total_PUT_CALL_RATIO", fo.get("TOTAL_PUT_CALL_RATIO", 0))
+                merged["FO_TOTAL_PUT_CALL_RATIO"] = fo.get("F&O_Total_PUT_CALL_RATIO", fo.get("Total_PUT_CALL_RATIO", fo.get("TOTAL_PUT_CALL_RATIO", 0)))
             
             # Extract Commodity data (handles FUT_COM, OPT_COM field names)
             if date_key in comder_by_date:
