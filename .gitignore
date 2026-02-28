@@ -13,9 +13,10 @@ venv/
 .venv/
 env/
 
-# Generated data & cache files (regenerated on each run)
+# Generated data & cache files
 *.json.cache
-*_cache.json
+# NOTE: *_cache.json files are NOW TRACKED — needed by GitHub Actions
+#       so it doesn't re-fetch from inception on every run
 # NOTE: nse_fo_aggregated_data.csv is KEPT (main output)
 # NOTE: nse_tbg_daily_consolidated.csv is KEPT (data source)
 # NOTE: reg_investors_cache/ is KEPT (historical data)

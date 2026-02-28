@@ -56,6 +56,9 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
           git add "Data 1/nse_fo_aggregated_data.csv"
+          git add "Data 1/"*_cache.json || true
+          git add "Data 1/reg_investors_cache/" || true
+          git add "Data 1/.cache/" || true
           git add "Data 1/execution.log" || true
           git add "Data 1/collector.log" || true
           
