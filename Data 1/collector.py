@@ -1603,17 +1603,9 @@ def write_output(
     if bse_idx_deriv is None:
         bse_idx_deriv = {}
     
-    # Extract the single/latest investor count values (not date-keyed)
-    # The caches contain a single entry with the date key of when it was fetched
-    nse_reg_inv_count = None
-    bse_reg_inv_count = None
-    
-    if nse_reg_inv:
-        # Get the most recent (or only) investor count from the cache
-        nse_reg_inv_count = next(iter(nse_reg_inv.values()), None) if nse_reg_inv else None
-    if bse_reg_inv:
-        # Get the most recent (or only) investor count from the cache
-        bse_reg_inv_count = next(iter(bse_reg_inv.values()), None) if bse_reg_inv else None
+    # Registered investors caches are date-keyed: {"DDMMYYYY": count, ...}
+    # Only dates when the collector actually ran will have values.
+    # Historical data is NOT available from the API (it only returns today's count).
     
     all_dates = sorted(
         set(nse) | set(bse) | set(cat) | set(eq_cat) | set(mrg) | set(part) | set(tbg) | set(mfss) | set(turnover) | set(bse_turnover) | set(bse_idx_deriv),
@@ -1686,8 +1678,8 @@ def write_output(
                     fi(p and p["NSE_CLT_TOTAL_LONG"]),
                     fi(p and p["NSE_CLT_FUT_IDX_LONG"]),
                     fi(p and p["NSE_CLT_FUT_IDX_SHORT"]),
-                    fi(nse_reg_inv_count),
-                    fi(bse_reg_inv_count),
+                    fi(nse_reg_inv.get(ds)),
+                    fi(bse_reg_inv.get(ds)),
                 ]
                 
                 # Add NSE MFSS data
