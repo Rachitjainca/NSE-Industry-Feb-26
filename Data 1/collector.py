@@ -57,6 +57,9 @@ RETRY_ATTEMPTS  = 4
 RETRY_DELAY     = 5   # seconds × attempt number
 SESSION_REFRESH = 20  # re-seed cookies every N downloads
 
+# Auto-extend collection range to current month
+COLLECTION_END_DATE = CURRENT_DATE
+
 # ── Shared HTTP headers ─────────────────────────────────────────────────────
 _BASE_HEADERS = {
     "User-Agent":      ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -1081,12 +1084,25 @@ class TBGDailyCollector:
 
     def collect(self) -> None:
         """Fetch and consolidate TBG data from all three segments."""
-        # Fetch for Feb 2025 to Feb 2026 (months with data)
-        months = [
-            ("Feb", "25"), ("Mar", "25"), ("Apr", "25"), ("May", "25"), 
-            ("Jun", "25"), ("Jul", "25"), ("Aug", "25"), ("Sep", "25"),
-            ("Oct", "25"), ("Nov", "25"), ("Dec", "25"), ("Jan", "26"), ("Feb", "26")
-        ]
+        # Generate months from Feb 2025 to current month (dynamic)
+        start_date = datetime(2025, 2, 1)
+        current_date = datetime.now()
+        
+        months = []
+        current_month = start_date
+        
+        while current_month <= current_date:
+            month_str = current_month.strftime("%b")
+            year_str = current_month.strftime("%y")
+            months.append((month_str, year_str))
+            
+            # Move to next month
+            if current_month.month == 12:
+                current_month = current_month.replace(year=current_month.year + 1, month=1)
+            else:
+                current_month = current_month.replace(month=current_month.month + 1)
+        
+        logger.info(f"[{self.tag}] Fetching data for {len(months)} months: {months[-5:]} (showing last 5)")
         
         all_cm = []
         all_fo = []
