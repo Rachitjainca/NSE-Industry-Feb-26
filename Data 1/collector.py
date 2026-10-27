@@ -253,9 +253,14 @@ def fetch_bse_reg_investors() -> Optional[int]:
     logger.info("[REG_INV][BSE] Fetching registered investors...")
     
     try:
-        # Create a session for the BSE requests
+        # Same headers as the working MTurnover/IdxDeriv calls; BSE_HEADERS now gets 403 on api.bseindia.com
         session = requests.Session()
-        session.headers.update(BSE_HEADERS)
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://www.bseindia.com/",
+            "Origin": "https://www.bseindia.com",
+        })
         
         # Step 1: Warm up session with homepage
         logger.info("[REG_INV][BSE] Warming up session...")
